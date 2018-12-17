@@ -20,7 +20,7 @@ const transcript = "https://horizon.mcgill.ca/pban1/bzsktran.P_Display_Form?user
 var user, pass string
 
 func main() {
-	user, pass, _ = credentials()
+	user, pass = credentials()
 
 	//create context
 	ctxt, cancel := context.WithCancel(context.Background())
@@ -54,35 +54,35 @@ func main() {
 	}
 
 }
-func credentials() (username, password, phone string) {
+func credentials() (string, string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Print("Enter Username: ")
-	username, _ = reader.ReadString('\n')
+	username, _ := reader.ReadString('\n')
+	username = strings.TrimSuffix(username, "\n")
 
 	fmt.Print("Enter Password: ")
 	bytePassword, _ := terminal.ReadPassword(int(syscall.Stdin))
-	password = string(bytePassword)
+	password := string(bytePassword)
 
 	// fmt.Print("\nEnter Phone Number: ")
 	// phone, _ = reader.ReadString('\n')
 	// phone = strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
 
-	return strings.TrimSpace(username), strings.TrimSpace(password), phone
+	return strings.TrimSpace(strings.TrimSuffix(username, "\n")), strings.TrimSpace(strings.TrimSuffix(password, "\n"))
 }
 
 func getTranscript(res *string) chromedp.Tasks {
 	return chromedp.Tasks{
+
 		//log-in
 		chromedp.Navigate(minerva),
 		chromedp.SendKeys(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="sid"]`, user),
 		chromedp.SendKeys(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`, pass),
 		chromedp.Submit(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`),
-		//chromedp.WaitNotVisible(`//input[@name="PIN"]`),
-
+		chromedp.WaitNotPresent(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`),
 		//Go to transcript page
-		//chromedp.Navigate(transcript),
-
+		chromedp.Navigate(transcript),
 		//chromedp.InnerHTML(`//div[@class="pagebodydiv]/table[1]`, res),
 	}
 }
