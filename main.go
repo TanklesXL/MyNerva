@@ -21,9 +21,8 @@ import (
 const minerva = "https://horizon.mcgill.ca/pban1/twbkwbis.P_WWWLogin"
 const transcript = "https://horizon.mcgill.ca/pban1/bzsktran.P_Display_Form?user_type=S&tran_type=V"
 const logout = "https://horizon.mcgill.ca/pban1/twbkwbis.P_Logout"
-const twilio = "https://api.twilio.com/2010-04-01/Accounts/"
 
-var user, pass, phone, twilPhone, twilioSID, twilioToken string
+var user, pass, phone, twilPhone, twilioSID, twilioToken, twilio string
 
 func main() {
 	//get user credentials
@@ -34,12 +33,12 @@ func main() {
 	var oldCourses, newCourses map[string]course
 	oldTable = getTranscriptWithSurf()
 	oldCourses = getCourses(oldTable)
+	twilio = "https://api.twilio.com/2010-04-01/Accounts/" + twilioSID + "/Messages.json"
+	notify("\nConfirmation of phone number for MyNerva.")
 
 	for {
 		newTable = getTranscriptWithSurf()
 		newCourses = getCourses(newTable)
-
-		notify("Confirmation of phone number for MyNerva.")
 		//check if different and handle
 		for key, newVal := range newCourses {
 			if oldVal, ok := oldCourses[key]; !ok {
@@ -50,8 +49,7 @@ func main() {
 		}
 		//set the new one as the old one and try again
 		oldTable = newTable
-
-		time.Sleep(10 * time.Second)
+		time.Sleep(10 * time.Minute)
 	}
 
 }
@@ -80,7 +78,7 @@ func credentials() {
 
 	fmt.Print("Enter Twilio Phone Number: ")
 	twilPhone, _ = reader.ReadString('\n')
-	twilPhone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
+	twilPhone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(twilPhone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
 
 	fmt.Print("Enter Twilo SID: ")
 	twilioSID, _ = reader.ReadString('\n')
@@ -150,7 +148,7 @@ func notify(message string) {
 		decoder := json.NewDecoder(resp.Body)
 		err := decoder.Decode(&data)
 		if err == nil {
-			fmt.Println(data["sid"])
+			fmt.Println("Message Sent: " + message)
 		}
 	} else {
 		fmt.Println(resp.Status)
@@ -173,5 +171,10 @@ func (m message) constructMessage() string {
 	return string(m)
 }
 func (c course) constructMessage() string {
-	return "yeh boiiiiiii"
+	var sb strings.Builder
+	sb.WriteString("Grade Notification\n")
+	sb.WriteString(c.courseCode + "\n")
+	sb.WriteString("Your Grade: " + c.yourMark + "\n")
+	sb.WriteString("Class Average: " + c.classAverage + "\n")
+	return sb.String()
 }
