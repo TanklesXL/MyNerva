@@ -155,9 +155,6 @@ func notify(message string) {
 	}
 }
 
-type sendable interface {
-	constructMessage() string
-}
 type course struct {
 	courseCode   string
 	courseName   string
