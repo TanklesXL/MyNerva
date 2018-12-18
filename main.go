@@ -2,59 +2,64 @@ package main
 
 import (
 	"bufio"
-	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/headzoo/surf"
 
-	"github.com/chromedp/chromedp"
+	"github.com/PuerkitoBio/goquery"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 const minerva = "https://horizon.mcgill.ca/pban1/twbkwbis.P_WWWLogin"
 const transcript = "https://horizon.mcgill.ca/pban1/bzsktran.P_Display_Form?user_type=S&tran_type=V"
+const logout = "https://horizon.mcgill.ca/pban1/twbkwbis.P_Logout"
+const twilio = "https://api.twilio.com/2010-04-01/Accounts/"
 
-var user, pass, phone, twilioSID, twilioToken string
+var user, pass, phone, twilPhone, twilioSID, twilioToken string
 
 func main() {
 	//get user credentials
 	credentials()
 
 	//get the current transcript
-	var oldTable string
-	getTranscript(&oldTable)
-	newTable := oldTable
-	oldCourses := getCourses(oldTable)
-	newCourses := getCourses(newTable)
+	var oldTable, newTable *goquery.Selection
+	var oldCourses, newCourses map[string]course
+	oldTable = getTranscriptWithSurf()
+	oldCourses = getCourses(oldTable)
 
 	for {
-		// every 10 minutes, check the transcript
-		time.Sleep(10 * time.Minute)
-		getTranscript(&newTable)
+		newTable = getTranscriptWithSurf()
 		newCourses = getCourses(newTable)
+
+		notify("Confirmation of phone number for MyNerva.")
 		//check if different and handle
 		for key, newVal := range newCourses {
 			if oldVal, ok := oldCourses[key]; !ok {
-				notifyOnCourse(newVal)
+				notify(newVal.constructMessage())
 			} else if oldVal != newVal {
-				notifyOnCourse(newVal)
+				notify(newVal.constructMessage())
 			}
 		}
 		//set the new one as the old one and try again
 		oldTable = newTable
+
+		time.Sleep(10 * time.Second)
 	}
 
 }
 
 func check(err error) {
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err.Error())
+		os.Exit(0)
 	}
 }
 
@@ -69,28 +74,26 @@ func credentials() {
 	bytePassword, _ := terminal.ReadPassword(int(syscall.Stdin))
 	pass = strings.TrimSpace(strings.TrimSuffix(string(bytePassword), "\n"))
 
-	// fmt.Print("\nEnter Phone Number: ")
-	// phone, _ = reader.ReadString('\n')
-	// phone = strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
+	fmt.Print("\nEnter Destination Phone Number: ")
+	phone, _ = reader.ReadString('\n')
+	phone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
 
-	// fmt.Print("Enter Twilo SID: ")
-	// twilioSID, _ = reader.ReadString('\n')
-	// twilioSID = strings.TrimSpace(strings.TrimSuffix(twilioSID, "\n"))
+	fmt.Print("Enter Twilio Phone Number: ")
+	twilPhone, _ = reader.ReadString('\n')
+	twilPhone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
 
-	// fmt.Print("Enter Twilio Auth Token: ")
-	// twilioToken, _ = reader.ReadString('\n')
-	// twilioToken = strings.TrimSpace(strings.TrimSuffix(twilioToken, "\n"))
+	fmt.Print("Enter Twilo SID: ")
+	twilioSID, _ = reader.ReadString('\n')
+	twilioSID = strings.TrimSpace(strings.TrimSuffix(twilioSID, "\n"))
+
+	fmt.Print("Enter Twilio Auth Token: ")
+	twilioToken, _ = reader.ReadString('\n')
+	twilioToken = strings.TrimSpace(strings.TrimSuffix(twilioToken, "\n"))
 }
 
-func getCourses(table string) map[string]course {
+func getCourses(table *goquery.Selection) map[string]course {
 	courses := make(map[string]course)
-
-	reader := strings.NewReader(table)
-
-	doc, err := goquery.NewDocumentFromReader(reader)
-	check(err)
-
-	doc.Find(`tr`).Each(func(i int, s1 *goquery.Selection) {
+	table.Find(`tr`).Each(func(i int, s1 *goquery.Selection) {
 		tdTags := s1.Find(`td`)
 		if tdTags.Length() == 11 {
 			var c course
@@ -113,46 +116,62 @@ func getCourses(table string) map[string]course {
 	return courses
 }
 
-func getTranscript(table *string) {
-
-	//create context
-	ctxt, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// create chrome instance
-	c, err := chromedp.New(ctxt, chromedp.WithLog(log.Printf))
-	check(err)
-
-	// run task list
-	tasks := chromedp.Tasks{
-		//log-in
-		chromedp.Navigate(minerva),
-		chromedp.SendKeys(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="sid"]`, user),
-		chromedp.SendKeys(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`, pass),
-		chromedp.Submit(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`),
-		chromedp.WaitNotPresent(`//form[@name="loginform1"]/table/tbody/tr/td[2]/input[@name="PIN"]`),
-		//Go to transcript page
-		chromedp.Navigate(transcript),
-		chromedp.InnerHTML(`//body/div[3]/table[2]`, table),
-		chromedp.Click(`//span[@class="pageheaderlinks"]/a[@accesskey="3"]`),
+func getTranscriptWithSurf() *goquery.Selection {
+	bow := surf.NewBrowser()
+	bow.Open(minerva)
+	fm, _ := bow.Form(`form[name="loginform1"]`)
+	fm.Input("sid", user)
+	fm.Input("PIN", pass)
+	fm.Submit()
+	bow.Open(transcript)
+	if strings.TrimSpace(bow.Title()) != "UNOFFICIAL Transcript for ID" {
+		fmt.Println("\nLOGIN FAILED")
+		os.Exit(0)
 	}
-
-	check(c.Run(ctxt, tasks))
-
-	// shutdown chrome
-	check(c.Shutdown(ctxt))
-
-	// wait for chrome to finish
-	check(c.Wait())
+	outputSel := bow.Find(`table.dataentrytable`).Last()
+	check(bow.Open(logout))
+	return outputSel
 }
 
-func notifyOnCourse(c course) {
-
+func notify(message string) {
+	msgData := url.Values{}
+	msgData.Set("To", phone)
+	msgData.Set("From", twilPhone)
+	msgData.Set("Body", message)
+	msgDataReader := *strings.NewReader(msgData.Encode())
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", twilio, &msgDataReader)
+	req.SetBasicAuth(twilioSID, twilioToken)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, _ := client.Do(req)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		var data map[string]interface{}
+		decoder := json.NewDecoder(resp.Body)
+		err := decoder.Decode(&data)
+		if err == nil {
+			fmt.Println(data["sid"])
+		}
+	} else {
+		fmt.Println(resp.Status)
+	}
 }
 
+type sendable interface {
+	constructMessage() string
+}
 type course struct {
 	courseCode   string
 	courseName   string
 	yourMark     string
 	classAverage string
+}
+
+type message string
+
+func (m message) constructMessage() string {
+	return string(m)
+}
+func (c course) constructMessage() string {
+	return "yeh boiiiiiii"
 }
