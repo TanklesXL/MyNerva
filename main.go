@@ -107,6 +107,9 @@ func getCourses(table *goquery.Selection) map[string]course {
 					c.classAverage = strings.TrimSpace(s2.Text())
 				}
 			})
+			if c.yourMark != "" {
+				courses[c.courseCode] = c
+			}
 			courses[c.courseCode] = c
 		}
 	})
