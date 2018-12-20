@@ -34,7 +34,7 @@ func main() {
 	oldTable = getTranscriptWithSurf()
 	oldCourses = getCourses(oldTable)
 
-	notify("\nConfirmation of phone number for MyNerva.")
+	notify("Confirmation of phone number for MyNerva.")
 
 	for {
 		newTable = getTranscriptWithSurf()
