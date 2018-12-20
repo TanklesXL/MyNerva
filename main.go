@@ -110,7 +110,6 @@ func getCourses(table *goquery.Selection) map[string]course {
 			if c.yourMark != "" {
 				courses[c.courseCode] = c
 			}
-			courses[c.courseCode] = c
 		}
 	})
 
