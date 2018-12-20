@@ -22,7 +22,7 @@ const minerva = "https://horizon.mcgill.ca/pban1/twbkwbis.P_WWWLogin"
 const transcript = "https://horizon.mcgill.ca/pban1/bzsktran.P_Display_Form?user_type=S&tran_type=V"
 const logout = "https://horizon.mcgill.ca/pban1/twbkwbis.P_Logout"
 
-var user, pass, phone, twilPhone, twilioSID, twilioToken, twilio string
+var user, pass, phone string
 
 func main() {
 	//get user credentials
@@ -33,7 +33,7 @@ func main() {
 	var oldCourses, newCourses map[string]course
 	oldTable = getTranscriptWithSurf()
 	oldCourses = getCourses(oldTable)
-	twilio = "https://api.twilio.com/2010-04-01/Accounts/" + twilioSID + "/Messages.json"
+
 	notify("\nConfirmation of phone number for MyNerva.")
 
 	for {
@@ -68,18 +68,6 @@ func credentials() {
 	fmt.Print("\nEnter Destination Phone Number: ")
 	phone, _ = reader.ReadString('\n')
 	phone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(phone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
-
-	fmt.Print("Enter Twilio Phone Number: ")
-	twilPhone, _ = reader.ReadString('\n')
-	twilPhone = "+1" + strings.Replace(strings.Replace(strings.Replace(strings.Replace(twilPhone, " ", "", -1), "(", "", -1), ")", "", -1), "-", "", -1)
-
-	fmt.Print("Enter Twilo SID: ")
-	twilioSID, _ = reader.ReadString('\n')
-	twilioSID = strings.TrimSpace(strings.TrimSuffix(twilioSID, "\n"))
-
-	fmt.Print("Enter Twilio Auth Token: ")
-	twilioToken, _ = reader.ReadString('\n')
-	twilioToken = strings.TrimSpace(strings.TrimSuffix(twilioToken, "\n"))
 }
 
 func getCourses(table *goquery.Selection) map[string]course {
@@ -127,6 +115,26 @@ func getTranscriptWithSurf() *goquery.Selection {
 }
 
 func notify(message string) {
+
+	twilioSID := os.Getenv("TWILIO_SID")
+	if twilioSID == "" {
+		fmt.Println("TWILIO_SID NOT SET")
+		os.Exit(0)
+	}
+	twilio := "https://api.twilio.com/2010-04-01/Accounts/" + twilioSID + "/Messages.json"
+
+	twilPhone := os.Getenv("TWILIO_PHONE")
+	if twilPhone == "" {
+		fmt.Println("TWILIO_PHONE NOT SET")
+		os.Exit(0)
+	}
+
+	twilioToken := os.Getenv("TWILIO_TOKEN")
+	if twilioToken == "" {
+		fmt.Println("TWILIO_TOKEN NOT SET")
+		os.Exit(0)
+	}
+
 	msgData := url.Values{}
 	msgData.Set("To", phone)
 	msgData.Set("From", twilPhone)
