@@ -54,13 +54,6 @@ func main() {
 
 }
 
-func check(err error) {
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
-	}
-}
-
 func credentials() {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -129,7 +122,7 @@ func getTranscriptWithSurf() *goquery.Selection {
 		os.Exit(0)
 	}
 	outputSel := bow.Find(`table.dataentrytable`).Last()
-	check(bow.Open(logout))
+	bow.Open(logout)
 	return outputSel
 }
 
@@ -164,11 +157,6 @@ type course struct {
 	classAverage string
 }
 
-type message string
-
-func (m message) constructMessage() string {
-	return string(m)
-}
 func (c course) constructMessage() string {
 	var sb strings.Builder
 	sb.WriteString("Grade Notification\n")
