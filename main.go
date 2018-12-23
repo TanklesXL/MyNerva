@@ -47,9 +47,11 @@ func main() {
 				notify(newVal.constructMessage())
 			}
 		}
+		fmt.Printf("Grades checked at %s\n", time.Now())
 		//set the new one as the old one and try again
 		oldTable = newTable
-		time.Sleep(10 * time.Minute)
+		oldCourses = newCourses
+		time.Sleep(20 * time.Minute)
 	}
 
 }
