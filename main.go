@@ -102,7 +102,10 @@ func getCourses(table *goquery.Selection) map[string]course {
 func getTranscriptWithSurf() *goquery.Selection {
 	bow := surf.NewBrowser()
 	bow.Open(minerva)
-	fm, _ := bow.Form(`form[name="loginform1"]`)
+	fm, err := bow.Form(`form[name="loginform1"]`)
+	for err != nil {
+		fm, err = bow.Form(`form[name="loginform1"]`)
+	}
 	fm.Input("sid", user)
 	fm.Input("PIN", pass)
 	fm.Submit()
